@@ -607,13 +607,21 @@ func (f *FlagSet) addTag(t *structTag, v Value) (err error) {
 }
 
 func normalize(name string) string {
-	b := new(strings.Builder)
 	var (
-		j int
-		l bool
+		j, k int
+		l    bool
 	)
 	r := []rune(name)
-	for i := range r {
+	for k = len(r) - 1; k > 0; k-- {
+		if !unicode.IsUpper(r[k]) {
+			break
+		}
+	}
+	if k == 0 {
+		return strings.ToLower(name)
+	}
+	b := new(strings.Builder)
+	for i := range r[:k+1] {
 		if i == 0 {
 			b.WriteRune(unicode.ToLower(r[i]))
 			continue
@@ -638,6 +646,11 @@ func normalize(name string) string {
 		l = u
 		b.WriteRune(unicode.ToLower(r[i]))
 	}
+	k++
+	if k < len(name)-2 {
+		b.WriteRune('-')
+	}
+	b.WriteString(strings.ToLower(string(r[k:])))
 	return b.String()
 }
 

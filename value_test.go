@@ -55,22 +55,23 @@ func TestNormalize(t *testing.T) {
 		out string
 	}{
 		{in: "FOO", out: "foo"},
-		{in: "FOO_BAR", out: "foobar"},
-		{in: "FooBAR", out: "foobar"},
+		{in: "FOO_BAR", out: "foo-bar"},
+		{in: "FooBAR", out: "foo-bar"},
 		{in: "FooBar", out: "foo-bar"},
 		{in: "FOOBar", out: "foo-bar"},
-		{in: "FOOBarBAZ", out: "foo-barbaz"},
+		{in: "FOOBarBAZ", out: "foo-bar-baz"},
 		{in: "FooBARBaz", out: "foobar-baz"},
 		{in: "IPAddress", out: "ip-address"},
 		{in: "IP_Address", out: "ip-address"},
 		{in: "Ip_Address", out: "ip-address"},
 		{in: "HTTPServerProtocolType", out: "http-server-protocol-type"},
-		{in: "HTTPServerProtocolTYPE", out: "http-server-protocoltype"},
+		{in: "HTTPServerProtocolTYPE", out: "http-server-protocol-type"},
 		{in: "RootFS", out: "rootfs"},
+		{in: "BugURL", out: "bug-url"},
 	} {
 		have := normalize(v.in)
 		if have != v.out {
-			t.Errorf("normalize(%q): want %q != have %q", v.in, have, v.out)
+			t.Errorf("normalize(%q): want %q != have %q", v.in, v.out, have)
 		}
 	}
 }
