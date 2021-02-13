@@ -517,6 +517,10 @@ func TestFlagArg(t *testing.T) {
 			args, rest, set []string
 			nc              bool
 		}{
+			{name: "empty", nc: true,
+				args: []string{""},
+				rest: []string{""},
+			},
 			{name: "foo", nc: true,
 				args: []string{"foo", "bar", "baz"},
 				rest: []string{"bar", "baz"},

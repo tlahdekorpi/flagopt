@@ -529,7 +529,7 @@ func (f *FlagSet) parseArg(arg string) (_ *FlagSet, err error) {
 	// TODO: Ambigous command threshold
 	// When below threshold, this is a map lookup of the exact match.
 	// Configurable per-command threshold.
-	if f.argc == 0 {
+	if f.argc == 0 && arg != "" {
 		fs, _ = f.clookup(arg)
 		// fs, i
 	}
