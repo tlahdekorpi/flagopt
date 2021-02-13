@@ -515,7 +515,6 @@ func TestFlagArg(t *testing.T) {
 		for _, v := range []struct {
 			name            string
 			args, rest, set []string
-			err             error
 			nc              bool
 		}{
 			{name: "foo", nc: true,
@@ -528,19 +527,14 @@ func TestFlagArg(t *testing.T) {
 				rest: []string{"foo"},
 			},
 			{name: "baz",
-				args: []string{"baz", "err"},
-				err:  errTooManyArguments, // testCaller
-			},
-			{name: "baz",
-				args: []string{"baz", "--", "-a", "--b", "arg"},
-				rest: []string{"-a", "--b", "arg"},
+				args: []string{"baz", "arg", "--", "-a", "--b", "arg"},
+				rest: []string{"arg", "-a", "--b", "arg"},
 			},
 		} {
 			fs := makeFlagSet(t, in...)
 			rest, err := fs.Parse(v.args)
-			if !errors.Is(err, v.err) {
-				t.Errorf("%s: Parse(%q): unexpected error: %v",
-					v.name, v.args, err)
+			if err != nil {
+				t.Errorf("%s: Parse(%q): error %v", v.name, v.args, err)
 				continue
 			}
 			if !reflect.DeepEqual(rest, v.rest) {

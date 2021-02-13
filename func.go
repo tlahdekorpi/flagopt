@@ -8,18 +8,21 @@ import (
 
 // Caller is the interface to the command value stored in a FlagSet.
 type Caller interface {
-	// Call is called after Set returns false, indicating all
-	// commands for this Caller are set.
 	Call() error
+}
 
-	// Set is used to prepare the command arguments.
-	// This should return false when there are no more arguments to set.
+var _ Caller = (*Func)(nil)
+
+// Setter is the optional interface used to set arguments for the caller.
+type Setter interface {
+	// Set is called for each non-option argument until it returns true,
+	// indicating that there are no more arguments to be set.
 	//
 	// An ErrBreak error can be returned to stop the parser.
 	Set(string) (bool, error)
 }
 
-var _ Caller = (*Func)(nil)
+var _ Setter = (*Func)(nil)
 
 // From is the optional interface used by the parser to inform the Caller
 // what is the current command argument.
@@ -28,6 +31,8 @@ var _ Caller = (*Func)(nil)
 type From interface {
 	// From is the same interface as Caller.Set but is called with the
 	// argument used to set the current FlagSet.
+	//
+	// An ErrBreak error can be returned to stop the parser.
 	From(string) (bool, error)
 }
 

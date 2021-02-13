@@ -89,12 +89,16 @@ func (f *FlagSet) New(name, desc string) *FlagSet {
 
 // Func sets the command of f to fn.
 // If fn does not implement the Caller interface, it is passed to NewFunc.
+// Callers that do not implement the Setter interface are marked as done
+// and take no arguments.
 func (f *FlagSet) Func(fn interface{}) {
 	if c, ok := fn.(Caller); ok {
 		f.cmd = c
 	} else if fn != nil {
 		f.cmd = NewFunc(fn)
 	}
+	_, ok := f.cmd.(Setter)
+	f.done = !ok
 }
 
 // next returns the first unused short value from name.
@@ -546,12 +550,14 @@ func (f *FlagSet) parseArg(arg string) (_ *FlagSet, err error) {
 			return nc, nil
 		}
 		if fi, ok := nc.cmd.(From); ok {
-			f.done, err = fi.From(nc.arg0)
+			nc.done, err = fi.From(nc.arg0)
 		}
 		return nc, err
 	}
 	if !f.done && f.cmd != nil {
-		f.done, err = f.cmd.Set(arg)
+		// If cmd returns false using the From interface and does
+		// not implement the Setter interface this will panic.
+		f.done, err = f.cmd.(Setter).Set(arg)
 		f.argc++
 		return
 	}
