@@ -19,6 +19,11 @@ type Flag struct {
 	Desc  string
 }
 
+type subset struct {
+	name string
+	fs   *FlagSet
+}
+
 // FlagSet is a set of options defined by Flag values.
 // Its zero value is a usable empty flagset.
 type FlagSet struct {
@@ -32,10 +37,11 @@ type FlagSet struct {
 	ll  []string
 	lls bool
 
-	cmds map[string]*FlagSet
+	cmds map[string]struct{}
 	// Sorted subset identifiers
-	cl  []string
+	cl  []subset
 	cls bool
+	ct  int
 
 	cmd  Caller
 	done bool
@@ -81,10 +87,17 @@ func (f *FlagSet) Describe(desc string) {
 // New returns a new subset identified by name with a description desc.
 // It panics if name or desc are empty strings.
 func (f *FlagSet) New(name, desc string) *FlagSet {
-	fs := new(FlagSet)
+	fs := &FlagSet{ct: f.ct}
 	fs.Describe(desc)
 	f.Register(fs, name)
 	return fs
+}
+
+// Len sets the minimum length of the matching remaining prefix for this set.
+// A negative length will always match a non-ambigous command.
+// Inherited by all subsets created using New.
+func (f *FlagSet) Len(i int) {
+	f.ct = i
 }
 
 // Func sets the command of f to fn.
@@ -441,7 +454,7 @@ func (f *FlagSet) parseLong(arg string, next []string) (err error) {
 
 func (f *FlagSet) register(fs *FlagSet, name ...string) error {
 	if f.cmds == nil {
-		f.cmds = make(map[string]*FlagSet)
+		f.cmds = make(map[string]struct{})
 	}
 	if fs == f {
 		// TODO: Handle flagset loops.
@@ -457,7 +470,7 @@ func (f *FlagSet) register(fs *FlagSet, name ...string) error {
 	if fs.name == "" {
 		fs.name, name = name[0], name[1:]
 		i--
-	} else if f.cmds[fs.name] == nil {
+	} else if _, ok := f.cmds[fs.name]; !ok {
 		i--
 	}
 	for ; i < len(name); i++ {
@@ -480,8 +493,8 @@ func (f *FlagSet) register(fs *FlagSet, name ...string) error {
 		if i != -1 {
 			fs.alias = append(fs.alias, v)
 		}
-		f.cmds[v] = fs
-		f.cl = append(f.cl, v)
+		f.cmds[v] = struct{}{}
+		f.cl = append(f.cl, subset{name: v, fs: fs})
 	}
 	return nil
 }
@@ -495,12 +508,40 @@ func (f *FlagSet) Register(fs *FlagSet, name ...string) {
 	}
 }
 
-func (f *FlagSet) clookup(prefix string) ([]string, int) {
+func (f *FlagSet) skip(prefix string) bool {
+	return f.ct > -1 && len(f.name)-len(prefix) > f.ct
+}
+
+func sublookup(a []subset, prefix string) (set []subset) {
+	i := sort.Search(len(a), func(i int) bool {
+		return a[i].name >= prefix
+	})
+	if i >= len(a) {
+		return
+	}
+	if a[i].name == prefix {
+		return a[i : i+1]
+	}
+	for j := i; j < len(a); j++ {
+		if !strings.HasPrefix(a[j].name, prefix) {
+			break
+		}
+		if a[j].fs.skip(prefix) {
+			continue
+		}
+		set = append(set, a[j])
+	}
+	return
+}
+
+func (f *FlagSet) sublookup(prefix string) (set []subset) {
 	if !f.cls {
-		sort.Strings(f.cl)
+		sort.Slice(f.cl, func(i, j int) bool {
+			return f.cl[i].name < f.cl[j].name
+		})
 		f.cls = true
 	}
-	return lookup(f.cl, prefix)
+	return sublookup(f.cl, prefix)
 }
 
 var (
@@ -520,48 +561,53 @@ var (
 	errNoCommand = errors.New("no such command")
 )
 
-func (f *FlagSet) parseArg(arg string) (_ *FlagSet, err error) {
-	var (
-		fs []string
-		// i int
-	)
-
-	// TODO: Ambigous command threshold
-	// When below threshold, this is a map lookup of the exact match.
-	// Configurable per-command threshold.
-	if f.argc == 0 && arg != "" {
-		fs, _ = f.clookup(arg)
-		// fs, i
-	}
-	if len(fs) > 1 {
-		return nil, fmt.Errorf(
-			"command %q is ambiguous; possibilities: %s", arg,
-			strings.Join(fs, ", "),
-		)
-	}
-	if fs != nil {
-		nc := f.cmds[fs[0]]
-		nc.arg0 = fs[0]
-		// TODO: FlagSet loops
-		// Remove commands on shifting to the next FlagSet.
-		// Configurable.
-		// f.cl = append(f.cl[:i], f.cl[i+1:]...)
-		if nc.cmd == nil {
-			return nc, nil
-		}
-		if fi, ok := nc.cmd.(From); ok {
-			nc.done, err = fi.From(nc.arg0)
-		}
-		return nc, err
-	}
+func (f *FlagSet) setArg(arg string) (err error) {
 	if !f.done && f.cmd != nil {
-		// If cmd returns false using the From interface and does
-		// not implement the Setter interface this will panic.
+		// If cmd returns false using the From interface and
+		// does not implement the Setter interface this will panic.
 		f.done, err = f.cmd.(Setter).Set(arg)
 		f.argc++
 		return
 	}
-	return nil, errNoCommand
+	return errNoCommand
+}
+
+func sjoin(s []subset, sep string) string {
+	b := new(strings.Builder)
+	for i, v := range s {
+		b.WriteString(v.name)
+		if i == len(s)-1 {
+			break
+		}
+		b.WriteString(sep)
+	}
+	return b.String()
+}
+
+func (f *FlagSet) parseArg(arg string) (_ *FlagSet, err error) {
+	var fs []subset
+	if f.argc == 0 && arg != "" {
+		fs = f.sublookup(arg)
+	}
+	if len(fs) > 1 {
+		return nil, fmt.Errorf(
+			"command %q is ambiguous; possibilities: %s", arg,
+			sjoin(fs, ", "),
+		)
+	}
+	if len(fs) == 0 {
+		return nil, f.setArg(arg)
+	}
+
+	nc := fs[0].fs
+	nc.arg0 = fs[0].name
+	if nc.cmd == nil {
+		return nc, nil
+	}
+	if fi, ok := nc.cmd.(From); ok {
+		nc.done, err = fi.From(nc.arg0)
+	}
+	return nc, err
 }
 
 func (f *FlagSet) parse(nc bool, arg string, next []string) (*FlagSet, error) {

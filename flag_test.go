@@ -474,9 +474,11 @@ type FromCaller interface {
 var _ FromCaller = (*testCaller)(nil)
 
 func makeFlagSet(t *testing.T, i ...interface{}) *FlagSet {
+	var (
+		lc  *testCaller
+		lfs *FlagSet
+	)
 	fs := new(FlagSet)
-	var lc *testCaller
-	var lfs *FlagSet
 	for _, v := range i {
 		tc := &testCaller{}
 		nfs := new(FlagSet)
@@ -488,12 +490,17 @@ func makeFlagSet(t *testing.T, i ...interface{}) *FlagSet {
 			nfs.Func(tc)
 			fs.Register(nfs, vt...)
 		case int:
-			if lc == nil {
-				panic("invalid syntax")
+			if lc != nil {
+				lc.argc = vt
+				lc = nil
+				continue
 			}
-			lc.argc = vt
-			lc = nil
-			continue
+			if lfs != nil {
+				lfs.ct = vt
+				lfs = nil
+				continue
+			}
+			panic("invalid syntax")
 		case nil:
 			if lfs == nil {
 				panic("invalid syntax")
@@ -511,7 +518,13 @@ func makeFlagSet(t *testing.T, i ...interface{}) *FlagSet {
 
 func TestFlagArg(t *testing.T) {
 	t.Run("parse", func(t *testing.T) {
-		in := []interface{}{"foo", nil, "bar", 2, "baz"}
+		in := []interface{}{
+			"foo", nil,
+			"bar", 2,
+			"baz", 0,
+			"command", 0, 3,
+			"negative", 0, -1,
+		}
 		for _, v := range []struct {
 			name            string
 			args, rest, set []string
@@ -534,6 +547,22 @@ func TestFlagArg(t *testing.T) {
 				args: []string{"baz", "arg", "--", "-a", "--b", "arg"},
 				rest: []string{"arg", "-a", "--b", "arg"},
 			},
+			{name: "command", nc: true, // no match
+				args: []string{"com", "bar"},
+				rest: []string{"com", "bar"},
+			},
+			{name: "command",
+				args: []string{"comm", "bar"},
+				rest: []string{"bar"},
+			},
+			{name: "negative",
+				args: []string{"n", "bar"},
+				rest: []string{"bar"},
+			},
+			{name: "no-match", nc: true,
+				args: []string{"b", "bar"},
+				rest: []string{"b", "bar"},
+			},
 		} {
 			fs := makeFlagSet(t, in...)
 			rest, err := fs.Parse(v.args)
@@ -549,12 +578,18 @@ func TestFlagArg(t *testing.T) {
 			if v.nc {
 				continue
 			}
-			tc := fs.cmds[v.name].cmd.(*testCaller)
-			if a, b := tc.from, v.name; a != b {
+			var tc *testCaller
+			if sl := fs.sublookup(v.name); len(sl) != 1 {
+				t.Errorf("sublookup(%s): %#v", v.name, sl)
+				continue
+			} else {
+				tc = sl[0].fs.cmd.(*testCaller)
+			}
+			if a, b := v.name, tc.from; a != b {
 				t.Errorf("%s: From mismatch: want %q != have %q", v.name, a, b)
 				continue
 			}
-			if a, b := tc.set, v.set; !reflect.DeepEqual(a, b) {
+			if a, b := v.set, tc.set; !reflect.DeepEqual(a, b) {
 				t.Errorf("%s: Set mismatch: want %q != have %q", v.name, a, b)
 				continue
 			}
@@ -654,8 +689,12 @@ func TestFlagArg(t *testing.T) {
 
 func testRegister(t *testing.T, fs, fn *FlagSet, names ...string) {
 	t.Helper()
+	fm := make(map[string]*FlagSet)
+	for _, v := range fs.cl {
+		fm[v.name] = v.fs
+	}
 	for i, v := range names {
-		vs, ok := fs.cmds[v]
+		vs, ok := fm[v]
 		if !ok {
 			t.Fatal("registered flagset not found")
 		}

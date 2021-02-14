@@ -3,7 +3,6 @@ package flagopt
 import (
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 	"text/tabwriter"
 )
@@ -86,21 +85,16 @@ func (f *FlagSet) signature(w io.Writer) {
 }
 
 func (f *FlagSet) usage(w io.Writer) {
-	sc := make([]string, 0, len(f.cmds))
-	for k, v := range f.cmds {
-		if v.name != k {
+	for i, v := range f.cl {
+		if v.name != v.fs.name {
 			// alias
 			continue
 		}
-		sc = append(sc, k)
-	}
-	sort.Strings(sc)
-	for i, v := range sc {
 		if i == 0 {
 			fmt.Fprintln(w, "Commands:")
 		}
-		f.cmds[v].signature(w)
-		if i == len(sc)-1 && len(f.ident) > 0 {
+		v.fs.signature(w)
+		if i == len(f.cl)-1 && len(f.ident) > 0 {
 			fmt.Fprintln(w)
 		}
 	}
