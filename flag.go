@@ -21,6 +21,7 @@ type Flag struct {
 
 type subset struct {
 	name string
+	id   int
 	fs   *FlagSet
 }
 
@@ -494,7 +495,7 @@ func (f *FlagSet) register(fs *FlagSet, name ...string) error {
 			fs.alias = append(fs.alias, v)
 		}
 		f.cmds[v] = struct{}{}
-		f.cl = append(f.cl, subset{name: v, fs: fs})
+		f.cl = append(f.cl, subset{name: v, fs: fs, id: len(f.cl)})
 	}
 	return nil
 }

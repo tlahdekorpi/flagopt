@@ -3,6 +3,7 @@ package flagopt
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"text/tabwriter"
 )
@@ -85,6 +86,11 @@ func (f *FlagSet) signature(w io.Writer) {
 }
 
 func (f *FlagSet) usage(w io.Writer) {
+	sort.Slice(f.cl, func(i, j int) bool {
+		return f.cl[i].id < f.cl[j].id
+	})
+	f.cls = false
+
 	for i, v := range f.cl {
 		if v.name != v.fs.name {
 			// alias
