@@ -611,6 +611,13 @@ func (f *FlagSet) parseArg(arg string) (_ *FlagSet, err error) {
 	return nc, err
 }
 
+func (f *FlagSet) isOption(arg string) bool {
+	if fi, ok := f.cmd.(IsOption); ok {
+		return fi.IsOption(arg)
+	}
+	return true
+}
+
 func (f *FlagSet) parse(nc bool, arg string, next []string) (*FlagSet, error) {
 	if arg == "--" {
 		return nil, errBreak
@@ -620,6 +627,9 @@ func (f *FlagSet) parse(nc bool, arg string, next []string) (*FlagSet, error) {
 		if i >= len(arg) || arg[i] != '-' {
 			break
 		}
+	}
+	if len(arg) > 1 && i > 0 && !f.isOption(arg) {
+		i = 0
 	}
 	// A single - won't be treated as a short option.
 	// This can be a argument to a command, usually meaning stdin.

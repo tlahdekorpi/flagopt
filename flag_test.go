@@ -782,3 +782,26 @@ func TestBreak(t *testing.T) {
 		testBreak(t, fs, "--foo", "--", "-f")
 	})
 }
+
+type isOptionCaller struct{ testCaller }
+
+func (i *isOptionCaller) IsOption(string) bool { return false }
+
+var _ IsOption = (*isOptionCaller)(nil)
+
+func testIsOption(t *testing.T, fs *FlagSet, args ...string) {
+	t.Helper()
+	rest, err := fs.Parse(args)
+	if err != nil {
+		t.Fatalf("Parse(%q): error: %v", args, err)
+	}
+	if a, b := args[1:], rest; !reflect.DeepEqual(a, b) {
+		t.Fatalf("Parse(%q): return arguments, want != have\n%q\n%q", args, a, b)
+	}
+}
+
+func TestIsOption(t *testing.T) {
+	fs := new(FlagSet)
+	fs.New("foo", "bar").Func(&isOptionCaller{})
+	testIsOption(t, fs, "foo", "-foo", "-bar", "-baz")
+}

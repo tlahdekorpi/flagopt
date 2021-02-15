@@ -361,3 +361,35 @@ func TestFuncSignature(t *testing.T) {
 		})
 	}
 }
+
+func TestFuncIsOption(t *testing.T) {
+	for _, v := range []struct {
+		name  string
+		isarg bool
+		arg   string
+		fn    interface{}
+	}{
+		{name: "empty", arg: "-foo", fn: func() {}},
+		{name: "empty-num", arg: "-0x200", fn: func() {}},
+		{name: "string", arg: "-foo", fn: func(string) {}},
+		{name: "string-num", arg: "-0x200", fn: func(string) {}},
+		{name: "uint", arg: "foo", fn: func(uint) {}},
+		{name: "uint-num", arg: "-0x200", fn: func(uint) {}},
+		{name: "int", arg: "foo", fn: func(int) {}},
+		{name: "int-num", arg: "-0x200", fn: func(int) {}, isarg: true},
+		{name: "float", arg: "foo", fn: func(float64) {}},
+		{name: "float-num", arg: "-0x1.1", fn: func(float64) {}},
+		{name: "float-dot", arg: "-.5", fn: func(float64) {}, isarg: true},
+		{name: "float-z-dot", arg: "-0.5", fn: func(float64) {}, isarg: true},
+	} {
+		t.Run(v.name, func(t *testing.T) {
+			fn, err := newFunc(v.fn)
+			if err != nil {
+				t.Fatalf("newFunc(): error %v", err)
+			}
+			if a, b := fn.IsOption(v.arg), !v.isarg; a != b {
+				t.Fatalf("IsOption(%q) != %v", v.arg, !v.isarg)
+			}
+		})
+	}
+}

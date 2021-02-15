@@ -3,6 +3,7 @@ package flagopt
 import (
 	"errors"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -45,6 +46,14 @@ type Signature interface {
 
 var _ Signature = (*Func)(nil)
 
+// IsOption is the optional interface used to determine when an option should
+// be treated as an argument.
+type IsOption interface {
+	IsOption(string) bool
+}
+
+var _ IsOption = (*Func)(nil)
+
 type setFinalizer interface {
 	set(string) (bool, error)
 	finalize() error
@@ -65,6 +74,7 @@ type arg struct {
 	value Value
 	kind  valueKind
 	next  *arg
+	num   bool
 }
 
 // Func represents a runtime function value.
@@ -80,6 +90,26 @@ var (
 	errTooManyArguments   = errors.New("too many arguments")
 	errNotEnoughArguments = errors.New("not enough arguments")
 )
+
+func (f *Func) IsOption(arg string) bool {
+	if f.current == nil {
+		return true
+	}
+	i, ok := f.current.value.(isNumFlag)
+	if !ok {
+		return true
+	}
+	var err error
+	switch i.isNumFlag() {
+	case numInt:
+		_, err = strconv.ParseInt(arg, 0, 64)
+	case numFloat:
+		_, err = strconv.ParseFloat(arg, 64)
+	default:
+		return true
+	}
+	return err != nil
+}
 
 // From returns true when function f holds zero parameters.
 func (f *Func) From(string) (bool, error) {

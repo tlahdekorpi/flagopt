@@ -15,6 +15,18 @@ type Type interface {
 	Type() string
 }
 
+type numKind int
+
+const (
+	numNan numKind = iota
+	numInt
+	numFloat
+)
+
+type isNumFlag interface {
+	isNumFlag() numKind
+}
+
 // Value is the flag.Value interface containing the Type interface.
 type Value interface {
 	flag.Value
@@ -77,6 +89,15 @@ func (p pointerValue) make() {
 		}
 		p.v.Set(reflect.New(p.v.Type().Elem()))
 	}
+}
+func (p pointerValue) isNumFlag() (_ numKind) {
+	if !p.v.IsValid() {
+		return
+	}
+	if i, ok := NewValue(p.new()).(isNumFlag); ok {
+		return i.isNumFlag()
+	}
+	return
 }
 func (p pointerValue) IsBoolFlag() bool {
 	if !p.v.IsValid() {
@@ -144,6 +165,20 @@ func (n numError) Error() string {
 	return fmt.Sprintf("unable to parse as %s, %s", n.t, n.Err)
 }
 
+func (v strconvValue) isNumFlag() (_ numKind) {
+	if !v.v.IsValid() {
+		return
+	}
+	switch v.v.Kind() {
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Bool, reflect.String:
+		return
+	case reflect.Float32, reflect.Float64:
+		return numFloat
+	}
+	return numInt
+}
+
 func (v strconvValue) Set(value string) (err error) {
 	switch k := v.v.Kind(); k {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -193,6 +228,12 @@ type sliceValue struct {
 
 func (p sliceValue) new() reflect.Value { return reflect.New(p.v.Type().Elem()) }
 func (p sliceValue) Type() string       { return NewValue(p.new().Interface()).Type() }
+func (p sliceValue) isNumFlag() (_ numKind) {
+	if i, ok := NewValue(p.new().Interface()).(isNumFlag); ok {
+		return i.isNumFlag()
+	}
+	return
+}
 func (p sliceValue) IsBoolFlag() bool {
 	if i, ok := NewValue(p.new().Interface()).(boolFlag); ok {
 		return i.IsBoolFlag()
@@ -224,6 +265,15 @@ func (p sliceValue) Set(v string) (err error) {
 
 type mapValue struct {
 	v reflect.Value
+}
+
+func (m mapValue) isNumFlag() (_ numKind) {
+	if i, ok := NewValue(reflect.New(
+		m.v.Type().Key(),
+	).Interface()).(isNumFlag); ok {
+		return i.isNumFlag()
+	}
+	return
 }
 
 func (m mapValue) Type() string {
@@ -278,6 +328,18 @@ type flagValue struct {
 	flag.Value
 }
 
+func (v flagValue) isNumFlag() (_ numKind) {
+	if i, ok := v.Value.(isNumFlag); ok {
+		return i.isNumFlag()
+	}
+	return
+}
+func (v flagValue) IsBoolFlag() bool {
+	if i, ok := v.Value.(boolFlag); ok {
+		return i.IsBoolFlag()
+	}
+	return false
+}
 func (v flagValue) Type() string {
 	rt := reflect.ValueOf(v.Value).Type()
 	for ; rt.Kind() == reflect.Ptr; rt = rt.Elem() {
@@ -289,6 +351,15 @@ type funcFlag struct {
 	*Func
 }
 
+func (f funcFlag) isNumFlag() (_ numKind) {
+	if f.Func.current == nil || f.Func.current.value == nil {
+		return
+	}
+	if i, ok := f.Func.current.value.(isNumFlag); ok {
+		return i.isNumFlag()
+	}
+	return
+}
 func (f funcFlag) IsBoolFlag() bool {
 	return f.Func.first == nil || f.Func.first.kind == variadic
 }
@@ -318,7 +389,24 @@ type structFlag struct {
 
 var _ setFinalizer = (*structFlag)(nil)
 
-func (f *structFlag) IsBoolFlag() bool             { return false }
+func (s *structFlag) isNumFlag() (_ numKind) {
+	if s.current == nil || s.current.value == nil {
+		return
+	}
+	if i, ok := s.current.value.(isNumFlag); ok {
+		return i.isNumFlag()
+	}
+	return
+}
+func (s *structFlag) IsBoolFlag() bool {
+	if s.current == nil || s.current.value == nil {
+		return false
+	}
+	if i, ok := s.current.value.(boolFlag); ok {
+		return i.IsBoolFlag()
+	}
+	return false
+}
 func (f *structFlag) Type() string                 { return (&Func{first: f.first}).Signature() }
 func (f *structFlag) String() (empty string)       { return }
 func (f *structFlag) Set(value string) (err error) { _, err = f.set(value); return }
@@ -402,7 +490,7 @@ func newStructFlag(v reflect.Value) (*structFlag, error) {
 		if err != nil {
 			return nil, err
 		}
-		args.value = &tagValue{Value: nv, v: t}
+		args.value = tagValue{Value: nv, typ: t.typ}
 
 		switch args.v.Elem().Kind() {
 		case reflect.Slice:
@@ -430,19 +518,24 @@ func newStructFlag(v reflect.Value) (*structFlag, error) {
 
 type tagValue struct {
 	Value
-	v *structTag
+	typ string
 }
 
-func (t *tagValue) IsBoolFlag() bool {
+func (t tagValue) isNumFlag() (_ numKind) {
+	if f, ok := t.Value.(isNumFlag); ok {
+		return f.isNumFlag()
+	}
+	return
+}
+func (t tagValue) IsBoolFlag() bool {
 	if f, ok := t.Value.(boolFlag); ok {
 		return f.IsBoolFlag()
 	}
 	return false
 }
-
-func (t *tagValue) Type() string {
-	if t.v.typ != "" {
-		return t.v.typ
+func (t tagValue) Type() string {
+	if t.typ != "" {
+		return t.typ
 	}
 	return t.Value.Type()
 }
@@ -576,7 +669,7 @@ func parseStructTag(name, tag string) *structTag {
 
 func (f *FlagSet) addTag(t *structTag, v Value) (err error) {
 	fl := &Flag{
-		Value: &tagValue{Value: v, v: t},
+		Value: tagValue{Value: v, typ: t.typ},
 		Desc:  t.desc,
 	}
 	_, ok := v.(*boolInverse)
