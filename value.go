@@ -475,6 +475,10 @@ func newStructFlag(v reflect.Value) (*structFlag, error) {
 	f := &structFlag{v: v}
 	var args *arg
 	for i, in := 0, v.NumField(); i < in; i++ {
+		rf := v.Field(i)
+		if !rf.CanSet() {
+			continue
+		}
 		t := parseFieldFlag(v.Type().Field(i))
 		if t == nil {
 			continue
@@ -485,7 +489,7 @@ func newStructFlag(v reflect.Value) (*structFlag, error) {
 			args = f.current
 		}
 
-		args.v = v.Field(i).Addr()
+		args.v = rf.Addr()
 		nv, err := newValue(args.v.Interface())
 		if err != nil {
 			return nil, err
