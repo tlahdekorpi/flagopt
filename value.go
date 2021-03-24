@@ -597,13 +597,11 @@ func newValue(v interface{}) (Value, error) {
 		return strconvComplex{strconvValue{re}}, nil
 	case reflect.Bool:
 		return strconvBool{strconvValue{re}}, nil
+	case reflect.Interface, reflect.Chan, reflect.Array:
+		panic(fmt.Sprintf("not implemented: %s", rv.Elem().Kind()))
 	default:
 		return strconvValue{re}, nil
 	}
-
-	// Not implemented, unreachable.
-	// reflect.Interface, reflect.Chan, reflect.Array
-	// panic(fmt.Sprintf("not implemented: %s", rv.Elem().Kind()))
 }
 
 type structTag struct {
