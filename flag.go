@@ -361,15 +361,17 @@ func (f *FlagSet) parseShort(arg string, next []string) (err error) {
 }
 
 func uniq(in []string) []string {
-	var j, n int = -1, 0
-	for i := range in {
-		if j != -1 && in[i] == in[j] {
-			continue
-		}
-		in[n], j = in[i], i
-		n++
+	if len(in) == 0 {
+		return in
 	}
-	return in[:n]
+	var n int
+	for i := 1; i < len(in); i++ {
+		if in[i] != in[i-1] {
+			n++
+			in[n] = in[i]
+		}
+	}
+	return in[:n+1]
 }
 
 func (f *FlagSet) parseLong(arg string, next []string) (err error) {
