@@ -299,7 +299,7 @@ func TestFlagParse(t *testing.T) {
 			{name: "c", fv: testFlag{arg: "arg2", set: true},
 				args: []string{"-c", "arg2"}},
 		} {
-			_, err := fs.Parse(v.args)
+			_, _, err := fs.Parse(v.args)
 			if err != nil {
 				t.Errorf("%s: Parse(%q): %v", v.name, v.args, err)
 				return
@@ -323,7 +323,7 @@ func TestFlagParse(t *testing.T) {
 		} {
 			var err error
 			if v.args != nil {
-				_, err = fs.Parse(v.args)
+				_, _, err = fs.Parse(v.args)
 			}
 			if err != nil {
 				t.Errorf("%s: Parse(%q): %v", v.name, v.args, err)
@@ -361,7 +361,7 @@ func TestFlagParse(t *testing.T) {
 		} {
 			var err error
 			if v.args != nil {
-				_, err = fs.Parse(v.args)
+				_, _, err = fs.Parse(v.args)
 			}
 			if err != nil {
 				t.Errorf("%s: Parse(%q): %v", v.name, v.args, err)
@@ -398,7 +398,7 @@ func TestFlagParse(t *testing.T) {
 		} {
 			var err error
 			if v.args != nil {
-				_, err = fs.Parse(v.args)
+				_, _, err = fs.Parse(v.args)
 			}
 			if err != nil {
 				t.Errorf("%s: Parse(%q): %v", v.name, v.args, err)
@@ -421,7 +421,7 @@ func TestFlagParse(t *testing.T) {
 		}
 
 		args := []string{"--f=arg1", "-b=arg2", "next", "--f", "-b", "--ba", "arg3"}
-		if _, err := fs.Parse(args); err != nil {
+		if _, _, err := fs.Parse(args); err != nil {
 			t.Errorf("Parse(%q): %v", args, err)
 			return
 		}
@@ -565,7 +565,7 @@ func TestFlagArg(t *testing.T) {
 			},
 		} {
 			fs := makeFlagSet(t, in...)
-			rest, err := fs.Parse(v.args)
+			rest, _, err := fs.Parse(v.args)
 			if err != nil {
 				t.Errorf("%s: Parse(%q): error %v", v.name, v.args, err)
 				continue
@@ -609,7 +609,7 @@ func TestFlagArg(t *testing.T) {
 		f3 := f2.New("baz", "desc")
 		f3.Func(&c)
 
-		if _, err := fs.Parse([]string{"foo", "bar", "baz"}); err != nil {
+		if _, _, err := fs.Parse([]string{"foo", "bar", "baz"}); err != nil {
 			t.Errorf("Parse(): error: %v", err)
 			return
 		}
@@ -642,7 +642,7 @@ func TestFlagArg(t *testing.T) {
 		f3 := f2.New("baz", "desc")
 		f3.Func(&c)
 
-		if _, err := fs.Parse([]string{"foo", "bar", "baz"}); err != nil {
+		if _, _, err := fs.Parse([]string{"foo", "bar", "baz"}); err != nil {
 			t.Errorf("Parse(): error: %v", err)
 			return
 		}
@@ -675,7 +675,7 @@ func TestFlagArg(t *testing.T) {
 			{name: "cmd", args: []string{"bar"}},
 		} {
 			fs := makeFlagSet(t, "foo", "bar")
-			if _, err := fs.Parse(v.args); err != nil {
+			if _, _, err := fs.Parse(v.args); err != nil {
 				t.Errorf("Parse(): error: %v", err)
 				continue
 			}
@@ -748,16 +748,19 @@ func TestRegister(t *testing.T) {
 
 type testBreakCaller struct{ testCaller }
 
-func (t *testBreakCaller) From(string) (bool, error) { return false, ErrBreak }
+func (t *testBreakCaller) From(string) (bool, error) { return false, BreakError{} }
 
 type testBreakFlag struct{ testFlag }
 
-func (t *testBreakFlag) Set(string) error { return ErrBreak }
+func (t *testBreakFlag) Set(string) error { return BreakError{} }
 
 func testBreak(t *testing.T, fs *FlagSet, args ...string) {
 	t.Helper()
-	rest, err := fs.Parse(args)
-	if !errors.Is(err, ErrBreak) {
+	rest, done, err := fs.Parse(args)
+	if !done {
+		t.Fatalf("Parse(%q): done != true", args)
+	}
+	if !errors.Is(err, BreakError{}) {
 		t.Fatalf("Parse(%q): unexpected error: %v", args, err)
 	}
 	if a, b := args[1:], rest; !reflect.DeepEqual(a, b) {
@@ -791,7 +794,7 @@ var _ IsOption = (*isOptionCaller)(nil)
 
 func testIsOption(t *testing.T, fs *FlagSet, args ...string) {
 	t.Helper()
-	rest, err := fs.Parse(args)
+	rest, _, err := fs.Parse(args)
 	if err != nil {
 		t.Fatalf("Parse(%q): error: %v", args, err)
 	}

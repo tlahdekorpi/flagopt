@@ -507,7 +507,7 @@ func TestLoadStruct(t *testing.T) {
 		}
 		out.Foo, out.Bar.Bar = "foo", "bar"
 		out.Baz.arg, out.Baz.set = "baz", true
-		if _, err := fs.Parse([]string{
+		if _, _, err := fs.Parse([]string{
 			"--foo", "foo",
 			"--bar", "bar",
 			"--baz", "baz",

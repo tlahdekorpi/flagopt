@@ -547,13 +547,27 @@ func (f *FlagSet) sublookup(prefix string) (set []subset) {
 	return sublookup(f.cl, prefix)
 }
 
-var (
-	// ErrBreak can be used as an error in either options or commands
-	// to break the parse loop and return rest of the arguments to the
-	// caller of Parse.
-	ErrBreak = errors.New("flagopt: break")
+// BreakError can be used to wrap an error in either options or commands
+// to stop the parse loop and return rest of the arguments to the
+// caller of Parse.
+type BreakError struct{ Err error }
 
-	// errBreak is the same as Break but not returned to the caller.
+func (e BreakError) Error() string {
+	if e.Err != nil {
+		return e.Err.Error()
+	}
+	return "break error"
+}
+
+func (e BreakError) Unwrap() error {
+	if e.Err != nil {
+		return e.Err
+	}
+	return nil
+}
+
+var (
+	// errBreak stops the parse loop.
 	errBreak = errors.New("break")
 
 	// errContinue indicates that the next argument should be skipped.
@@ -649,7 +663,8 @@ func (f *FlagSet) parse(nc bool, arg string, next []string) (*FlagSet, error) {
 
 // Parse reads arguments from the list and returns all unparsed arguments
 // to the caller. Should be called after all options are defined.
-func (f *FlagSet) Parse(args []string) (rest []string, err error) {
+// Done is set when the returning error is a BreakError.
+func (f *FlagSet) Parse(args []string) (rest []string, done bool, err error) {
 	var (
 		i    int
 		next bool
@@ -662,7 +677,7 @@ loop:
 			continue
 		}
 		if err != nil {
-			return rest, fs.err(err)
+			return rest, done, fs.err(err)
 		}
 
 		var fn *FlagSet
@@ -674,11 +689,7 @@ loop:
 
 		switch err {
 		case errBreak:
-			// Unlike Break this is not returned
 			err = nil
-			fallthrough
-		case ErrBreak:
-			// Returned to the caller
 			break loop
 		case errContinue:
 			// Skip the next argument
@@ -691,18 +702,18 @@ loop:
 		case nil:
 			continue
 		}
-		// Exported break error might be wrapped
-		if errors.Is(err, ErrBreak) {
+
+		if done = errors.Is(err, BreakError{}); done {
 			break
 		}
-		return rest, fs.err(err)
+		return rest, done, fs.err(err)
 	}
 
 	f.call = fs
 	if i != len(args) {
 		rest = append(rest, args[i+1:]...)
 	}
-	return rest, fs.err(err)
+	return rest, done, fs.err(err)
 }
 
 // Caller returns the current parsed caller.
