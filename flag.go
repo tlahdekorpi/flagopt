@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"unicode"
@@ -56,6 +57,7 @@ type FlagSet struct {
 	desc  string
 	alias []string
 	arg0  string
+	flags int
 }
 
 // New returns a new, empty FlagSet identified by name with a description desc.
@@ -85,10 +87,23 @@ func (f *FlagSet) Describe(desc string) {
 	f.desc = desc
 }
 
+// FlagSet configuration flags.
+const (
+	// Automatically include a help flag when adding a command or flag
+	// to a FlagSet.
+	Fautohelp = 1 << iota
+)
+
+// SetFlags sets the configuration flags for this set.
+// Inherited by all subsets created using New.
+func (f *FlagSet) SetFlags(flags int) {
+	f.flags = flags
+}
+
 // New returns a new subset identified by name with a description desc.
 // It panics if name or desc are empty strings.
 func (f *FlagSet) New(name, desc string) *FlagSet {
-	fs := &FlagSet{ct: f.ct}
+	fs := &FlagSet{ct: f.ct, flags: f.flags}
 	fs.Describe(desc)
 	f.Register(fs, name)
 	return fs
@@ -151,9 +166,34 @@ func (f *FlagSet) Add(fl *Flag) {
 	}
 }
 
+func (f *FlagSet) autoHelp() (err error) {
+	if f.flags&Fautohelp == 0 {
+		return
+	}
+	if len(f.ident) > 0 {
+		return
+	}
+	fl := &Flag{
+		Value: breakFlag(func() error {
+			return f.Usage(os.Stdout)
+		}),
+		Short: []rune{'h'},
+		Long:  []string{"help"},
+		Desc:  "Show this help",
+	}
+	return f.add1(fl)
+}
+
 var errNoOptions = errors.New("no options defined for flag")
 
 func (f *FlagSet) add(fl *Flag) error {
+	if err := f.autoHelp(); err != nil {
+		return err
+	}
+	return f.add1(fl)
+}
+
+func (f *FlagSet) add1(fl *Flag) error {
 	if f.short == nil || f.long == nil {
 		f.short, f.long = make(map[rune]*Flag), make(map[string]*Flag)
 	}
@@ -456,6 +496,9 @@ func (f *FlagSet) parseLong(arg string, next []string) (err error) {
 }
 
 func (f *FlagSet) register(fs *FlagSet, name ...string) error {
+	if err := f.autoHelp(); err != nil {
+		return err
+	}
 	if f.cmds == nil {
 		f.cmds = make(map[string]struct{})
 	}
@@ -742,4 +785,16 @@ func (f *FlagSet) Exec() (err error) {
 		}
 	}
 	return
+}
+
+type breakFlag func() error
+
+func (f breakFlag) String() string   { return "false" }
+func (f breakFlag) IsBoolFlag() bool { return true }
+func (f breakFlag) Set(arg string) error {
+	v, err := parseBool(arg)
+	if err == nil && v {
+		return BreakError{f()}
+	}
+	return err
 }

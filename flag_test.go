@@ -241,6 +241,28 @@ func TestFlagSetSet(t *testing.T) {
 	})
 }
 
+func TestFlagSetFlags(t *testing.T) {
+	t.Run("autohelp", func(t *testing.T) {
+		t.Run("unset", func(t *testing.T) {
+			fs := new(FlagSet)
+			fs.Add(makeFlagV(&testFlag{}, 't'))
+			checkFlags(t, fs, 't')
+		})
+		t.Run("flag", func(t *testing.T) {
+			fs := &FlagSet{flags: Fautohelp}
+			fs.Add(makeFlagV(&testFlag{}, 't'))
+			checkFlags(t, fs, 'h', "help", 't')
+		})
+		t.Run("subset", func(t *testing.T) {
+			fs := &FlagSet{flags: Fautohelp}
+			fn := new(FlagSet)
+			fs.Register(fn, "test")
+			checkFlags(t, fs, 'h', "help")
+			checkFlags(t, fn)
+		})
+	})
+}
+
 type testFlag struct {
 	b   bool
 	set bool
