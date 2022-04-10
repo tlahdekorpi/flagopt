@@ -74,7 +74,6 @@ type arg struct {
 	value Value
 	kind  valueKind
 	next  *arg
-	num   bool
 }
 
 // Func represents a runtime function value.

@@ -347,6 +347,18 @@ func (v flagValue) Type() string {
 	return rt.Kind().String()
 }
 
+func parseBool(str string) (b bool, err error) {
+	b, err = strconv.ParseBool(str)
+	if err == nil {
+		return
+	}
+	var ne *strconv.NumError
+	if !errors.As(err, &ne) {
+		return
+	}
+	return b, numError{NumError: ne, t: reflect.Bool}
+}
+
 type funcFlag struct {
 	*Func
 }
@@ -366,10 +378,20 @@ func (f funcFlag) IsBoolFlag() bool {
 func (f funcFlag) Type() string           { return f.Func.Signature() }
 func (f funcFlag) String() (empty string) { return }
 func (f funcFlag) Set(value string) (err error) {
+	var bv bool
+	if f.IsBoolFlag() {
+		bv, err = parseBool(value)
+		if err != nil {
+			return
+		}
+		if !bv {
+			return
+		}
+	}
 	if f.Func.first == nil {
 		return f.Func.Call()
 	}
-	if f.Func.first.kind == variadic && value == "true" {
+	if f.Func.first.kind == variadic && bv {
 		return f.Func.Call()
 	}
 	// TODO: Implement setFinalizer
