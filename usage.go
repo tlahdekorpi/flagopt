@@ -96,8 +96,13 @@ func (f *FlagSet) usage(w io.Writer) {
 			// alias
 			continue
 		}
-		if i == 0 {
+		if i == 0 && v.gid == 0 {
 			fmt.Fprintln(w, "Commands:")
+		} else if i == 0 {
+			fmt.Fprintf(w, "%s Commands:\n", f.cgroup[v.gid-1])
+		}
+		if i > 0 && v.gid > 0 && v.gid != f.cl[i-1].gid {
+			fmt.Fprintf(w, "\n%s Commands:\n", f.cgroup[v.gid-1])
 		}
 		v.fs.signature(w)
 		if i == len(f.cl)-1 && len(f.ident) > 0 {
@@ -111,8 +116,13 @@ func (f *FlagSet) usage(w io.Writer) {
 		}
 	}
 	for j, v := range f.ident {
-		if j == 0 {
+		if j == 0 && v.gid == 0 {
 			fmt.Fprintln(w, "Options:")
+		} else if j == 0 {
+			fmt.Fprintf(w, "%s Options:\n", f.igroup[v.gid-1])
+		}
+		if j > 0 && v.gid > 0 && v.gid != f.ident[j-1].gid {
+			fmt.Fprintf(w, "\n%s Options:\n", f.igroup[v.gid-1])
 		}
 		v.usage(w, i)
 	}

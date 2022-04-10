@@ -18,11 +18,13 @@ type Flag struct {
 	Short []rune
 	Long  []string
 	Desc  string
+	gid   int
 }
 
 type subset struct {
 	name string
 	id   int
+	gid  int
 	fs   *FlagSet
 }
 
@@ -30,7 +32,8 @@ type subset struct {
 // Its zero value is a usable empty flagset.
 type FlagSet struct {
 	// List of all Flag identifiers in this set
-	ident []*Flag
+	ident  []*Flag
+	igroup []string
 
 	// Lookup maps for all short/long identifiers
 	short map[rune]*Flag
@@ -41,9 +44,10 @@ type FlagSet struct {
 
 	cmds map[string]struct{}
 	// Sorted subset identifiers
-	cl  []subset
-	cls bool
-	ct  int
+	cl     []subset
+	cgroup []string
+	cls    bool
+	ct     int
 
 	cmd  Caller
 	done bool
@@ -216,8 +220,27 @@ func (f *FlagSet) add1(fl *Flag) error {
 		}
 		return fmt.Errorf("option --%s, flag already exists", v)
 	}
+	fl.gid = len(f.igroup)
 	f.ident = append(f.ident, fl)
 	return nil
+}
+
+// SetFlagGroup sets the group for new flags in Usage to name.
+// It panics when name is an empty string.
+func (f *FlagSet) SetFlagGroup(name string) {
+	if name == "" {
+		panic("empty group name")
+	}
+	f.igroup = append(f.igroup, name)
+}
+
+// SetSubsetGroup sets the group for new FlagSets in Usage to name.
+// It panics when name is an empty string.
+func (f *FlagSet) SetSubsetGroup(name string) {
+	if name == "" {
+		panic("empty group name")
+	}
+	f.cgroup = append(f.cgroup, name)
 }
 
 // Set long and short options for value v identified by name.
@@ -540,7 +563,9 @@ func (f *FlagSet) register(fs *FlagSet, name ...string) error {
 			fs.alias = append(fs.alias, v)
 		}
 		f.cmds[v] = struct{}{}
-		f.cl = append(f.cl, subset{name: v, fs: fs, id: len(f.cl)})
+		f.cl = append(f.cl, subset{
+			name: v, fs: fs, id: len(f.cl), gid: len(f.cgroup),
+		})
 	}
 	return nil
 }
