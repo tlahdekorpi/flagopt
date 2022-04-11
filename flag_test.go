@@ -359,6 +359,54 @@ func TestFlagParse(t *testing.T) {
 			}
 		}
 	})
+	t.Run("short-range", func(t *testing.T) {
+		type tm map[string]*testFlag
+		for _, v := range []struct {
+			args []string
+			fv   tm
+		}{
+			{args: []string{"-42"}, fv: tm{
+				"#": {arg: "42", set: true},
+			}},
+			{args: []string{"-b42"}, fv: tm{
+				"#": {},
+				"b": {arg: "42", set: true},
+			}},
+			{args: []string{"-42bc"}, fv: tm{
+				"#": {arg: "42", set: true},
+				"b": {arg: "c", set: true},
+				"c": {},
+			}},
+			{args: []string{"-a42c2b"}, fv: tm{
+				"a": {arg: "true", set: true, b: true},
+				"#": {arg: "42", set: true},
+				"c": {arg: "2b", set: true},
+				"b": {},
+			}},
+		} {
+			fs, m := mapFlagSet(t, 'a', true, 'b', 'c')
+			tr := &testFlag{}
+			if _, err := fs.setRange("", "", tr); err != nil {
+				t.Errorf("setRange(%q): %v", v.args, err)
+			}
+			_, _, err := fs.Parse(v.args)
+			if err != nil {
+				t.Errorf("Parse(%q): %v", v.args, err)
+				return
+			}
+			for name, fv := range v.fv {
+				var vt *testFlag
+				if name == "#" {
+					vt = tr
+				} else {
+					vt = m[name]
+				}
+				if a, b := *fv, *vt; a != b {
+					t.Errorf("flag mismatch %q, want != have\n%#v\n%#v", name, a, b)
+				}
+			}
+		}
+	})
 	t.Run("long", func(t *testing.T) {
 		fs, m := mapFlagSet(t,
 			"foo", true,

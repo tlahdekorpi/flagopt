@@ -8,8 +8,15 @@ import (
 	"text/tabwriter"
 )
 
-func (f *Flag) usage(w io.Writer, l int) {
+func (f *Flag) usage(w io.Writer, l int, isRange bool) {
 	io.WriteString(w, "  ")
+	if isRange {
+		l--
+		fmt.Fprint(w, "-#")
+		if len(f.Short) > 0 {
+			fmt.Fprint(w, " ")
+		}
+	}
 	for i, v := range f.Short {
 		fmt.Fprintf(w, "-%s", string(v))
 		if i != len(f.Short)-1 {
@@ -18,7 +25,7 @@ func (f *Flag) usage(w io.Writer, l int) {
 	}
 	for i, v := range f.Long {
 		if i == 0 {
-			if len(f.Short) > 0 {
+			if len(f.Short) > 0 || isRange {
 				io.WriteString(w, " ")
 			}
 			io.WriteString(w, strings.Repeat(
@@ -30,14 +37,16 @@ func (f *Flag) usage(w io.Writer, l int) {
 			io.WriteString(w, " ")
 		}
 	}
-	if v, ok := f.Value.(boolFlag); ok && !v.IsBoolFlag() || !ok {
-		io.WriteString(w, "=")
-		if v, ok := f.Value.(Value); ok {
+	if isRange && len(f.Short)+len(f.Long) > 0 || !isRange {
+		if v, ok := f.Value.(boolFlag); ok && !v.IsBoolFlag() || !ok {
+			io.WriteString(w, "=")
+			if v, ok := f.Value.(Value); ok {
+				io.WriteString(w, v.Type())
+			}
+		}
+		if v, ok := f.Value.(funcFlag); ok && v.IsBoolFlag() && v.first != nil {
 			io.WriteString(w, v.Type())
 		}
-	}
-	if v, ok := f.Value.(funcFlag); ok && v.IsBoolFlag() && v.first != nil {
-		io.WriteString(w, v.Type())
 	}
 	if f.Desc == "" {
 		io.WriteString(w, "\t\n")
@@ -124,7 +133,7 @@ func (f *FlagSet) usage(w io.Writer) {
 		if j > 0 && v.gid > 0 && v.gid != f.ident[j-1].gid {
 			fmt.Fprintf(w, "\n%s Options:\n", f.igroup[v.gid-1])
 		}
-		v.usage(w, i)
+		v.usage(w, i, f.rv == v)
 	}
 }
 

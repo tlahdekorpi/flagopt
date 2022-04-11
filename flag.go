@@ -41,6 +41,7 @@ type FlagSet struct {
 	// Sorted long identifiers
 	ll  []string
 	lls bool
+	rv  *Flag
 
 	cmds map[string]struct{}
 	// Sorted subset identifiers
@@ -274,6 +275,39 @@ func (f *FlagSet) set(name, desc string, value flag.Value) (*Flag, error) {
 	return fl, f.add(fl)
 }
 
+// SetRange sets the range value as v with a description desc.
+// Short range value is identified by a sequence of numbers in short options.
+// Long flag is not defined when long is a empty string.
+// Value v is passed to NewValue.
+func (f *FlagSet) SetRange(long, desc string, v interface{}) *Flag {
+	fl, err := f.setRange(long, desc, NewValue(v))
+	if err != nil {
+		panic(err)
+	}
+	return fl
+}
+
+func (f *FlagSet) setRange(long, desc string, value flag.Value) (*Flag, error) {
+	if f.rv != nil {
+		return nil, errors.New("range flag already exists")
+	}
+	if err := f.autoHelp(); err != nil {
+		return nil, err
+	}
+	fl := &Flag{
+		Desc:  desc,
+		Value: value,
+		gid:   len(f.igroup),
+	}
+	f.rv = fl
+	if len(long) > 0 {
+		fl.Long = []string{long}
+		return fl, f.add1(fl)
+	}
+	f.ident = append(f.ident, fl)
+	return fl, nil
+}
+
 // lookup searches a sorted slice of strings for a prefix.
 // Returns a slice of matching prefixes and the starting slice index.
 // When the prefix is an exact match only it is returned.
@@ -306,11 +340,11 @@ func (f *FlagSet) llookup(prefix string) []string {
 	return r
 }
 
-func eqArg(arg string) (string, bool) {
+func eqArg(arg []rune) (string, bool) {
 	if len(arg) > 0 && arg[0] == '=' {
-		return arg[1:], true
+		return string(arg[1:]), true
 	}
-	return arg, false
+	return string(arg), false
 }
 
 // boolFlag is similar to the flag.boolFlag interface, indicating when an option
@@ -370,26 +404,55 @@ func (f *FlagSet) err(err error) error {
 	return fmt.Errorf("%s: %w", strings.Join(fn, " "), err)
 }
 
+func isNum(r rune) bool { return '0' <= r && r <= '9' }
+
 func (f *FlagSet) parseShort(arg string, next []string) (err error) {
 	var (
-		i int
-		v rune
+		v  rune
+		rv *Flag
+		ri int
 	)
-	for i, v = range arg {
+loop:
+	for i, ra := 0, []rune(arg); i < len(ra); i++ {
+		v = ra[i]
 		var (
 			fv *Flag
 			ok bool
 		)
+		if rv != nil {
+			n := i
+			if in := isNum(v); in && i < len(ra)-1 {
+				continue
+			} else if in {
+				n++
+			}
+			err = rv.Set(arg[ri:n])
+			if err != nil {
+				v = '#'
+				break
+			}
+			rv = nil
+			if n >= len(ra) {
+				break
+			}
+		}
 		for p := f; p != nil; p = p.prev {
+			if p.rv != nil && isNum(v) {
+				rv, ri, ok = p.rv, i, true
+				i--
+				continue loop
+			}
 			if fv, ok = p.short[v]; ok {
 				break
 			}
 		}
 		if !ok {
-			return fmt.Errorf("undefined option -%s", string(v))
+			return fmt.Errorf("undefined option -%s",
+				string(v),
+			)
 		}
 
-		argv, eq := eqArg(arg[i+1:])
+		argv, eq := eqArg(ra[i+1:])
 		if b, ok := fv.Value.(boolFlag); ok && b.IsBoolFlag() {
 			if eq {
 				err = fv.Set(argv)
@@ -398,7 +461,7 @@ func (f *FlagSet) parseShort(arg string, next []string) (err error) {
 				err = fv.Set("true")
 			}
 		} else {
-			eq = i != len(arg)-1
+			eq = i != len(ra)-1
 			if !eq && len(next) > 0 {
 				argv = next[0]
 			}
