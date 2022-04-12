@@ -616,8 +616,8 @@ func (f *FlagSet) sublookup(prefix string) (set []subset) {
 }
 
 // BreakError can be used to wrap an error in either options or commands
-// to stop the parse loop and return rest of the arguments to the
-// caller of Parse.
+// to conditionally stop the parse loop and return rest of the arguments to
+// the caller of Parse.
 type BreakError struct{ Err error }
 
 func (e BreakError) Error() string {
@@ -731,7 +731,7 @@ func (f *FlagSet) parse(nc bool, arg string, next []string) (*FlagSet, error) {
 
 // Parse reads arguments from the list and returns all unparsed arguments
 // to the caller. Should be called after all options are defined.
-// Done is set when the returning error is a BreakError.
+// Done is set when the returning error is a zero value BreakError.
 func (f *FlagSet) Parse(args []string) (rest []string, done bool, err error) {
 	var (
 		i    int
