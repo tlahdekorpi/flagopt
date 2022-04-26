@@ -250,50 +250,49 @@ func (f *FlagSet) SetSubsetGroup(name string) {
 	f.cgroup = append(f.cgroup, name)
 }
 
-// Set long and short options for value v identified by name.
-// The next undefined rune from name is used as the short option identifier.
-// No long options are defined when name is only a single character.
+// Set long and short options for value v identified by ident.
+// Short option identifiers are single rune length strings.
 // Value v is passed to NewValue.
-func (f *FlagSet) Set(name, desc string, v interface{}) *Flag {
-	fl, err := f.set(name, desc, NewValue(v))
+// It panics on zero length identifiers and NewValue errors.
+func (f *FlagSet) Set(v interface{}, desc string, ident ...string) *Flag {
+	fl, err := f.set(NewValue(v), desc, ident...)
 	if err != nil {
 		panic(err)
 	}
 	return fl
 }
 
-func (f *FlagSet) set(name, desc string, value flag.Value) (*Flag, error) {
+func (f *FlagSet) set(value Value, desc string, ident ...string) (*Flag, error) {
 	fl := &Flag{
 		Desc:  desc,
 		Value: value,
 	}
-	if len(name) > 1 {
-		fl.Long = []string{name}
-	} else if len(name) == 1 {
-		fl.Short = []rune(name)[:1]
-		return fl, f.add(fl)
+	for _, v := range ident {
+		rv := []rune(v)
+		if len(rv) > 1 {
+			fl.Long = append(fl.Long, v)
+		} else if len(rv) == 1 {
+			fl.Short = append(fl.Short, rv[0])
+		} else {
+			return nil, errors.New("zero length identifier")
+		}
 	}
-	r, err := f.next(name)
-	if err != nil {
-		return nil, err
-	}
-	fl.Short = []rune{r}
 	return fl, f.add(fl)
 }
 
-// SetRange sets the range value as v with a description desc.
+// SetRange sets the range value as v with a description desc and optional
+// long options identified by ident.
 // Short range value is identified by a sequence of numbers in short options.
-// Long flag is not defined when long is a empty string.
 // Value v is passed to NewValue.
-func (f *FlagSet) SetRange(long, desc string, v interface{}) *Flag {
-	fl, err := f.setRange(long, desc, NewValue(v))
+func (f *FlagSet) SetRange(v interface{}, desc string, ident ...string) *Flag {
+	fl, err := f.setRange(NewValue(v), desc, ident...)
 	if err != nil {
 		panic(err)
 	}
 	return fl
 }
 
-func (f *FlagSet) setRange(long, desc string, value flag.Value) (*Flag, error) {
+func (f *FlagSet) setRange(value Value, desc string, ident ...string) (*Flag, error) {
 	if f.rv != nil {
 		return nil, errors.New("range flag already exists")
 	}
@@ -306,8 +305,8 @@ func (f *FlagSet) setRange(long, desc string, value flag.Value) (*Flag, error) {
 		gid:   len(f.igroup),
 	}
 	f.rv = fl
-	if len(long) > 0 {
-		fl.Long = []string{long}
+	if len(ident) > 0 {
+		fl.Long = ident
 		return fl, f.add1(fl)
 	}
 	f.ident = append(f.ident, fl)

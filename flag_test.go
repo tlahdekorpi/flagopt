@@ -222,20 +222,16 @@ func TestFlagSetSet(t *testing.T) {
 	t.Run("long", func(t *testing.T) {
 		fs := new(FlagSet)
 		in := []string{"foo", "bar", "baz"}
-		for _, v := range in {
-			if _, err := fs.set(v, "desc", nil); err != nil {
-				t.Fatalf("flagset.set(%q) error: %v", v, err)
-			}
+		if _, err := fs.set(nil, "desc", in...); err != nil {
+			t.Fatalf("flagset.set(%q) error: %v", in, err)
 		}
 		checkFlags(t, fs, in)
 	})
 	t.Run("short", func(t *testing.T) {
 		fs := new(FlagSet)
 		in := []string{"f", "b", "B"}
-		for _, v := range in {
-			if _, err := fs.set(v, "desc", nil); err != nil {
-				t.Fatalf("flagset.set(%q) error: %v", v, err)
-			}
+		if _, err := fs.set(nil, "desc", in...); err != nil {
+			t.Fatalf("flagset.set(%q) error: %v", in, err)
 		}
 		checkFlags(t, fs, 'f', 'b', 'B')
 	})
@@ -386,7 +382,7 @@ func TestFlagParse(t *testing.T) {
 		} {
 			fs, m := mapFlagSet(t, 'a', true, 'b', 'c')
 			tr := &testFlag{}
-			if _, err := fs.setRange("", "", tr); err != nil {
+			if _, err := fs.setRange(tr, ""); err != nil {
 				t.Errorf("setRange(%q): %v", v.args, err)
 			}
 			_, _, err := fs.Parse(v.args)
