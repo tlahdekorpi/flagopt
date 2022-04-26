@@ -249,12 +249,12 @@ func TestFlagSetFlags(t *testing.T) {
 			checkFlags(t, fs, 't')
 		})
 		t.Run("flag", func(t *testing.T) {
-			fs := &FlagSet{flags: Fautohelp}
+			fs := &FlagSet{flags: FlagHelp}
 			fs.Add(makeFlagV(&testFlag{}, 't'))
 			checkFlags(t, fs, 'h', "help", 't')
 		})
 		t.Run("subset", func(t *testing.T) {
-			fs := &FlagSet{flags: Fautohelp}
+			fs := &FlagSet{flags: FlagHelp}
 			fn := new(FlagSet)
 			fs.Register(fn, "test")
 			checkFlags(t, fs, 'h', "help")

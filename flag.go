@@ -62,7 +62,7 @@ type FlagSet struct {
 	desc  string
 	alias []string
 	arg0  string
-	flags int
+	flags FlagSetFlag
 }
 
 // New returns a new, empty FlagSet identified by name with a description desc.
@@ -71,6 +71,7 @@ func New(name, desc string) *FlagSet {
 	fs := new(FlagSet)
 	fs.Describe(desc)
 	fs.Name(name)
+	fs.SetFlags(FlagDefault)
 	return fs
 }
 
@@ -92,16 +93,21 @@ func (f *FlagSet) Describe(desc string) {
 	f.desc = desc
 }
 
-// FlagSet configuration flags.
+// FlagSetFlag is a set of configuration bits for FlagSets.
+type FlagSetFlag int
+
+func (f FlagSetFlag) has(bits FlagSetFlag) bool { return f&bits != 0 }
+
 const (
-	// Automatically include a help flag when adding a command or flag
-	// to a FlagSet.
-	Fautohelp = 1 << iota
+	// Include a help flag when adding a command or flag to a FlagSet.
+	FlagHelp FlagSetFlag = 1 << iota
+
+	FlagDefault = FlagHelp
 )
 
 // SetFlags sets the configuration flags for this set.
 // Inherited by all subsets created using New.
-func (f *FlagSet) SetFlags(flags int) {
+func (f *FlagSet) SetFlags(flags FlagSetFlag) {
 	f.flags = flags
 }
 
@@ -172,7 +178,7 @@ func (f *FlagSet) Add(fl *Flag) {
 }
 
 func (f *FlagSet) autoHelp() (err error) {
-	if f.flags&Fautohelp == 0 {
+	if !f.flags.has(FlagHelp) {
 		return
 	}
 	if len(f.ident) > 0 {
