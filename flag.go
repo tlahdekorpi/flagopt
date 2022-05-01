@@ -725,6 +725,18 @@ func (f *FlagSet) setArg(arg string) (err error) {
 	return errNoCommand
 }
 
+func (f *FlagSet) setArgs(args []string) (i int, err error) {
+	for ; i < len(args); i++ {
+		err = f.setArg(args[i])
+		if err == errNoCommand {
+			return i - 1, nil
+		} else if err != nil {
+			break
+		}
+	}
+	return
+}
+
 func sjoin(s []subset, sep string) string {
 	b := new(strings.Builder)
 	for i, v := range s {
@@ -825,8 +837,12 @@ loop:
 
 		switch err {
 		case errBreak:
-			err = nil
-			break loop
+			var j int
+			j, err = fs.setArgs(args[i+1:])
+			if err == nil {
+				i += j + 1
+				break loop
+			}
 		case errContinue:
 			// Skip the next argument
 			err, next = nil, true

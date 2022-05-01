@@ -609,11 +609,23 @@ func TestFlagArg(t *testing.T) {
 				set:  []string{"baz", "arg"},
 				rest: []string{"foo"},
 			},
+			// Set all arguments after break
+			{name: "bar",
+				args: []string{"bar", "--", "baz", "arg", "foo"},
+				set:  []string{"baz", "arg"},
+				rest: []string{"foo"},
+			},
 			{name: "baz",
 				args: []string{"baz", "arg", "--", "-a", "--b", "arg"},
 				rest: []string{"arg", "-a", "--b", "arg"},
 			},
-			{name: "command", nc: true, // no match
+			// No command matching after break
+			{name: "bar", nc: true,
+				args: []string{"--", "bar", "-1", "2"},
+				rest: []string{"bar", "-1", "2"},
+			},
+			// Command length too short
+			{name: "command", nc: true,
 				args: []string{"com", "bar"},
 				rest: []string{"com", "bar"},
 			},
