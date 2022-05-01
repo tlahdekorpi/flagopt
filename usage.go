@@ -100,9 +100,15 @@ func (f *FlagSet) usage(w io.Writer) {
 	})
 	f.cls = false
 
+	nl := func(i int) {
+		if i == len(f.cl)-1 && len(f.ident) > 0 {
+			fmt.Fprintln(w)
+		}
+	}
 	for i, v := range f.cl {
 		if v.name != v.fs.name {
 			// alias
+			nl(i)
 			continue
 		}
 		if i == 0 && v.gid == 0 {
@@ -114,9 +120,7 @@ func (f *FlagSet) usage(w io.Writer) {
 			fmt.Fprintf(w, "\n%s Commands:\n", f.cgroup[v.gid-1])
 		}
 		v.fs.signature(w)
-		if i == len(f.cl)-1 && len(f.ident) > 0 {
-			fmt.Fprintln(w)
-		}
+		nl(i)
 	}
 	var i int
 	for _, v := range f.ident {
