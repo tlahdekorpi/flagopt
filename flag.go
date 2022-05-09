@@ -210,14 +210,18 @@ func (f *FlagSet) autoHelp() (err error) {
 	return f.add1(fl)
 }
 
-var errNoOptions = errors.New("no options defined for flag")
-
 func (f *FlagSet) add(fl *Flag) error {
 	if err := f.autoHelp(); err != nil {
 		return err
 	}
 	return f.add1(fl)
 }
+
+var (
+	errNoOptions       = errors.New("no options defined for flag")
+	errZeroLengthIdent = errors.New("zero length identifier")
+	errFlagExists      = errors.New("flag already exists")
+)
 
 func (f *FlagSet) add1(fl *Flag) error {
 	if f.short == nil || f.long == nil {
@@ -228,19 +232,28 @@ func (f *FlagSet) add1(fl *Flag) error {
 		return errNoOptions
 	}
 	for _, v := range fl.Short {
+		if v == '-' {
+			return fmt.Errorf("%w: %q", errInvalidOption, v)
+		}
 		if _, ok := f.short[v]; !ok {
 			f.short[v] = fl
 			continue
 		}
-		return fmt.Errorf("option -%s, flag already exists", string(v))
+		return fmt.Errorf("option -%c, %w", v, errFlagExists)
 	}
 	for _, v := range fl.Long {
+		if len(v) == 0 {
+			return errZeroLengthIdent
+		}
+		if v[0] == '-' {
+			return fmt.Errorf("%w: %q", errInvalidOption, v)
+		}
 		if _, ok := f.long[v]; !ok {
 			f.long[v] = fl
 			f.ll = append(f.ll, v)
 			continue
 		}
-		return fmt.Errorf("option --%s, flag already exists", v)
+		return fmt.Errorf("option --%s, %w", v, errFlagExists)
 	}
 	fl.gid = len(f.igroup)
 	f.ident = append(f.ident, fl)
@@ -289,7 +302,7 @@ func (f *FlagSet) set(value Value, desc string, ident ...string) (*Flag, error) 
 		} else if len(rv) == 1 {
 			fl.Short = append(fl.Short, rv[0])
 		} else {
-			return nil, errors.New("zero length identifier")
+			return nil, errZeroLengthIdent
 		}
 	}
 	return fl, f.add(fl)
@@ -309,7 +322,7 @@ func (f *FlagSet) SetRange(v interface{}, desc string, ident ...string) *Flag {
 
 func (f *FlagSet) setRange(value Value, desc string, ident ...string) (*Flag, error) {
 	if f.rv != nil {
-		return nil, errors.New("range flag already exists")
+		return nil, fmt.Errorf("range %w", errFlagExists)
 	}
 	if err := f.autoHelp(); err != nil {
 		return nil, err
@@ -467,9 +480,7 @@ loop:
 			}
 		}
 		if !ok {
-			return fmt.Errorf("undefined option -%s",
-				string(v),
-			)
+			return fmt.Errorf("undefined option -%c", v)
 		}
 
 		argv, eq := eqArg(ra[i+1:])
@@ -486,7 +497,7 @@ loop:
 				argv = next[0]
 			}
 			if argv == "" {
-				return fmt.Errorf("option requires an argument -%s", string(v))
+				return fmt.Errorf("option requires an argument -%c", v)
 			}
 			if err = fv.Set(argv); err == nil {
 				if eq {
@@ -501,7 +512,7 @@ loop:
 		}
 	}
 	if err != nil {
-		return fmt.Errorf("-%s, %w", string(v), err)
+		return fmt.Errorf("-%c, %w", v, err)
 	}
 	return nil
 }

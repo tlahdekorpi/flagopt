@@ -97,7 +97,7 @@ func checkFlags(t *testing.T, fs *FlagSet, i ...interface{}) {
 	for _, v := range sf {
 		_, ok := fs.short[v]
 		if !ok {
-			t.Errorf("missing short option: -%s from flagset", string(v))
+			t.Errorf("missing short option: -%c from flagset", v)
 			continue
 		}
 	}
@@ -182,41 +182,46 @@ func TestFlagAdd(t *testing.T) {
 		err  error
 		in   interface{}
 	}{
-		{"long", nil, []string{"foo", "bar", "baz"}},
-		{"short", nil, []rune{'a', 'b', 'c'}},
-		{"long+short", nil, []interface{}{"foo", "bar", 'a', 'b'}},
-		{"none", errNoOptions, nil},
+		{name: "long",
+			in: []string{"foo", "bar", "baz"},
+		},
+		{name: "short",
+			in: []rune{'a', 'b', 'c'},
+		},
+		{name: "long+short",
+			in: []interface{}{"foo", "bar", 'a', 'b'},
+		},
+		{name: "zero-length", err: errZeroLengthIdent,
+			in: []string{""},
+		},
+		{name: "dash-long", err: errInvalidOption,
+			in: []string{"-foo"},
+		},
+		{name: "dash-short", err: errInvalidOption,
+			in: []rune{'-'},
+		},
+		{name: "short-exists", err: errFlagExists,
+			in: []rune{'a', 'a'},
+		},
+		{name: "long-exists", err: errFlagExists,
+			in: []string{"foo", "foo"},
+		},
+		{name: "none", err: errNoOptions},
 	}
 	for _, v := range tc {
 		t.Run(v.name, func(t *testing.T) {
 			fs, err := flagSetWith(v.in)
-			if err == v.err {
-				checkFlags(t, fs, v.in)
+			if !errors.Is(err, v.err) {
+				t.Errorf("unexpected error: want != have"+
+					"\n%v\n%v", v.err, err)
 				return
 			}
-			t.Errorf("flagset(%q): \nwant: %v\nhave: %v",
-				v.in, v.err, err,
-			)
+			if v.err != nil {
+				return
+			}
+			checkFlags(t, fs, v.in)
 		})
 	}
-	t.Run("exists", func(t *testing.T) {
-		fs, err := flagSetWith("foo", 'f')
-		if err != nil {
-			t.Fatalf("flagset error: %v", err)
-		}
-		t.Run("long", func(t *testing.T) {
-			err := fs.add(makeFlag("foo"))
-			if err == nil {
-				t.Errorf("unexpected nil error")
-			}
-		})
-		t.Run("short", func(t *testing.T) {
-			err := fs.add(makeFlag('f'))
-			if err == nil {
-				t.Errorf("unexpected nil error")
-			}
-		})
-	})
 }
 
 func TestFlagSetSet(t *testing.T) {
