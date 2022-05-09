@@ -18,7 +18,7 @@ func (f *Flag) usage(w io.Writer, l int, isRange bool) {
 		}
 	}
 	for i, v := range f.Short {
-		fmt.Fprintf(w, "-%s", string(v))
+		fmt.Fprintf(w, "-%c", v)
 		if i != len(f.Short)-1 {
 			io.WriteString(w, " ")
 		}
@@ -114,10 +114,10 @@ func (f *FlagSet) usage(w io.Writer) {
 		if i == 0 && v.gid == 0 {
 			fmt.Fprintln(w, "Commands:")
 		} else if i == 0 {
-			fmt.Fprintf(w, "%s Commands:\n", f.cgroup[v.gid-1])
+			fmt.Fprintf(w, "%s\n", f.cgroup[v.gid-1])
 		}
 		if i > 0 && v.gid > 0 && v.gid != f.cl[i-1].gid {
-			fmt.Fprintf(w, "\n%s Commands:\n", f.cgroup[v.gid-1])
+			fmt.Fprintf(w, "\n%s\n", f.cgroup[v.gid-1])
 		}
 		v.fs.signature(w)
 		nl(i)
@@ -132,10 +132,10 @@ func (f *FlagSet) usage(w io.Writer) {
 		if j == 0 && v.gid == 0 {
 			fmt.Fprintln(w, "Options:")
 		} else if j == 0 {
-			fmt.Fprintf(w, "%s Options:\n", f.igroup[v.gid-1])
+			fmt.Fprintf(w, "%s\n", f.igroup[v.gid-1])
 		}
 		if j > 0 && v.gid > 0 && v.gid != f.ident[j-1].gid {
-			fmt.Fprintf(w, "\n%s Options:\n", f.igroup[v.gid-1])
+			fmt.Fprintf(w, "\n%s\n", f.igroup[v.gid-1])
 		}
 		v.usage(w, i, f.rv == v)
 	}
