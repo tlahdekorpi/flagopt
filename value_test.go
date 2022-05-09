@@ -89,12 +89,12 @@ func TestAddTag(t *testing.T) {
 			fv: new(boolInverse)},
 
 		{name: "short", out: 'f', tag: &structTag{short: "f"}},
-		{name: "short-next", in: 'f', out: []rune{'f', 'F'},
+		{name: "short-next", in: 'f', out: []rune{'f', 'o'},
 			tag: &structTag{short: "foo"}},
 
 		{name: "long+short",
 			in:  []interface{}{'f', "foo"},
-			out: []interface{}{'f', 'F', "foo", "bar"},
+			out: []interface{}{'f', 'o', "foo", "bar"},
 			tag: &structTag{
 				short: "foo",
 				long:  "bar",
@@ -103,7 +103,7 @@ func TestAddTag(t *testing.T) {
 
 		{name: "auto",
 			in:  'f',
-			out: []interface{}{'f', 'F', "foo"},
+			out: []interface{}{'f', 'o', "foo"},
 			tag: &structTag{
 				long: "foo",
 				auto: true,

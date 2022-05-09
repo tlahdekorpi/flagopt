@@ -141,29 +141,44 @@ func (f *FlagSet) Func(fn interface{}) {
 	f.done = !ok
 }
 
-// next returns the first unused short value from name.
-func (f *FlagSet) next(name string) (rune, error) {
-	var (
-		v  rune
-		ok bool
-	)
+func (f *FlagSet) find(name string) (v rune, ok bool) {
 	for _, v = range name {
 		if v == '-' {
 			continue
 		}
 		if _, ok = f.short[v]; !ok {
-			break
-		}
-		v = unicode.SimpleFold(v)
-		if _, ok = f.short[v]; !ok {
-			break
+			return
 		}
 	}
+	for _, v = range name {
+		if v == '-' {
+			continue
+		}
+		if n := unicode.ToUpper(v); n == v {
+			v = unicode.ToLower(v)
+		} else {
+			v = n
+		}
+		if _, ok = f.short[v]; !ok {
+			return
+		}
+	}
+	return
+}
+
+var (
+	errInvalidOption   = errors.New("invalid option identifier")
+	errNoUndefinedOpts = errors.New("no undefined options")
+)
+
+// next returns the first unused short value from name.
+func (f *FlagSet) next(name string) (rune, error) {
+	v, ok := f.find(name)
 	if v == '-' {
-		return -1, fmt.Errorf("invalid option identifier: %q", v)
+		return -1, fmt.Errorf("%w: %q", errInvalidOption, v)
 	}
 	if ok {
-		return -1, fmt.Errorf("no undefined options found: %q", name)
+		return -1, fmt.Errorf("%w: %q", errNoUndefinedOpts, name)
 	}
 	return v, nil
 }

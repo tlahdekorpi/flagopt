@@ -140,37 +140,38 @@ func checkFlags(t *testing.T, fs *FlagSet, i ...interface{}) {
 }
 
 func TestFlagNext(t *testing.T) {
-	fs, err := flagSetWith([]rune("foFObBaR"))
-	if err != nil {
-		t.Fatalf("flagset error: %v", err)
-	}
 	for _, v := range []struct {
-		name string
-		in   string
-		r    rune
-		err  bool
+		name, in, fs string
+		out          rune
+		err          error
 	}{
-		{"add", "foo-bar", 'A', false},
-		{"next", "bar", 'r', false},
-		{"full", "foo", -1, true},
-		{"invalid", "-", -1, true},
+		{name: "first", in: "foo", out: 'f', fs: "F"},
+		{name: "next-rune", in: "bar", out: 'a', fs: "b"},
+		{name: "upper", in: "Bar", out: 'R', fs: "barBA"},
+		{name: "dashed", in: "foo-bar", out: 'b', fs: "fo"},
+		{name: "unavail", in: "foo-bar", fs: "foFObarBAR",
+			err: errNoUndefinedOpts},
+		{name: "dash", in: "-", fs: "fo",
+			err: errInvalidOption},
 	} {
 		t.Run(v.name, func(t *testing.T) {
+			fs, err := flagSetWith([]rune(v.fs))
+			if err != nil {
+				t.Fatalf("flagset error: %v", err)
+			}
 			r, err := fs.next(v.in)
-			if !v.err && err != nil {
-				t.Errorf("unexpected error: %v", err)
-				return
-			} else if v.err && err == nil {
-				t.Error("unexpected nil error")
+			if !errors.Is(err, v.err) {
+				t.Errorf("unexpected error: want != have"+
+					"\n%v\n%v", v.err, err)
 				return
 			}
-			if r == v.r {
-				fs.short[r] = nil
+			if v.err != nil {
 				return
 			}
-			t.Errorf("invalid next rune: w:%q != h:%q",
-				string(v.r), string(r),
-			)
+			if r == v.out {
+				return
+			}
+			t.Errorf("invalid next rune: want %q != have %q", v.out, r)
 		})
 	}
 }
