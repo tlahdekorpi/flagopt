@@ -262,6 +262,13 @@ func TestFlagSetFlags(t *testing.T) {
 			checkFlags(t, fs, 'h', "help")
 			checkFlags(t, fn)
 		})
+		t.Run("load", func(t *testing.T) {
+			fs := &FlagSet{flags: FlagHelp}
+			fs.Load(&struct {
+				Help bool `flag:"help,;"`
+			}{})
+			checkFlags(t, fs, 'h', "help", 'e')
+		})
 	})
 }
 

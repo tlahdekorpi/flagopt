@@ -704,6 +704,9 @@ func (f *FlagSet) addTag(t *structTag, v Value) (err error) {
 			fl.Long = []string{t.long}
 		}
 	}
+	if err := f.autoHelp(); err != nil {
+		return err
+	}
 	if len(t.short) > 1 {
 		s, err := f.next(t.short)
 		if err != nil {
@@ -720,7 +723,7 @@ func (f *FlagSet) addTag(t *structTag, v Value) (err error) {
 		}
 		fl.Short = []rune{s}
 	}
-	return f.add(fl)
+	return f.add1(fl)
 }
 
 func normalize(name string) string {
