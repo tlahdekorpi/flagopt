@@ -241,6 +241,18 @@ func TestFlagSetSet(t *testing.T) {
 		}
 		checkFlags(t, fs, 'f', 'b', 'B')
 	})
+	t.Run("range", func(t *testing.T) {
+		fs := new(FlagSet)
+		in := []string{"foo", "bar", "baz", "f", "b", "B"}
+		rv, err := fs.setRange(nil, "desc", in...)
+		if err != nil {
+			t.Fatalf("flagset.setRange(%q) error: %v", in, err)
+		}
+		checkFlags(t, fs, "foo", "bar", "baz", 'f', 'b', 'B')
+		if !reflect.DeepEqual(fs.rv, rv) {
+			t.Fatalf("flagset.rv != rv")
+		}
+	})
 }
 
 func TestFlagSetFlags(t *testing.T) {

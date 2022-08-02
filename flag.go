@@ -290,26 +290,33 @@ func (f *FlagSet) Set(v interface{}, desc string, ident ...string) *Flag {
 	return fl
 }
 
-func (f *FlagSet) set(value Value, desc string, ident ...string) (*Flag, error) {
+func splitIdent(ident ...string) (long []string, short []rune, err error) {
+	for _, v := range ident {
+		rv := []rune(v)
+		if len(rv) > 1 {
+			long = append(long, v)
+		} else if len(rv) == 1 {
+			short = append(short, rv[0])
+		} else {
+			return nil, nil, errZeroLengthIdent
+		}
+	}
+	return
+}
+
+func (f *FlagSet) set(value Value, desc string, ident ...string) (_ *Flag, err error) {
 	fl := &Flag{
 		Desc:  desc,
 		Value: value,
 	}
-	for _, v := range ident {
-		rv := []rune(v)
-		if len(rv) > 1 {
-			fl.Long = append(fl.Long, v)
-		} else if len(rv) == 1 {
-			fl.Short = append(fl.Short, rv[0])
-		} else {
-			return nil, errZeroLengthIdent
-		}
+	if fl.Long, fl.Short, err = splitIdent(ident...); err != nil {
+		return
 	}
 	return fl, f.add(fl)
 }
 
 // SetRange sets the range value as v with a description desc and optional
-// long options identified by ident.
+// long and short identifiers.
 // Short range value is identified by a sequence of numbers in short options.
 // Value v is passed to NewValue.
 func (f *FlagSet) SetRange(v interface{}, desc string, ident ...string) *Flag {
@@ -320,25 +327,27 @@ func (f *FlagSet) SetRange(v interface{}, desc string, ident ...string) *Flag {
 	return fl
 }
 
-func (f *FlagSet) setRange(value Value, desc string, ident ...string) (*Flag, error) {
+func (f *FlagSet) setRange(value Value, desc string, ident ...string) (fl *Flag, err error) {
 	if f.rv != nil {
 		return nil, fmt.Errorf("range %w", errFlagExists)
 	}
-	if err := f.autoHelp(); err != nil {
-		return nil, err
+	if err = f.autoHelp(); err != nil {
+		return
 	}
-	fl := &Flag{
+	fl = &Flag{
 		Desc:  desc,
 		Value: value,
 		gid:   len(f.igroup),
 	}
 	f.rv = fl
-	if len(ident) > 0 {
-		fl.Long = ident
-		return fl, f.add1(fl)
+	if len(ident) == 0 {
+		f.ident = append(f.ident, fl)
+		return
 	}
-	f.ident = append(f.ident, fl)
-	return fl, nil
+	if fl.Long, fl.Short, err = splitIdent(ident...); err != nil {
+		return
+	}
+	return fl, f.add1(fl)
 }
 
 // lookup searches a sorted slice of strings for a prefix.
